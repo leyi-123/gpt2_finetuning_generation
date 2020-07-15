@@ -34,7 +34,7 @@ length = 0
 epoch = 3
 a_loss = 0
 # 对训练数据的处理
-# 这里没有用torch里面的DataLoader, TensorDataset, 可以考虑改进
+# 这里没有用torch里面的DataLoader, TensorDataset, 需改进
 for num in range(epoch):
     i_sum = 0
     for data in l:
