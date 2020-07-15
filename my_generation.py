@@ -7,7 +7,7 @@ import random
 import os
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 # gpt2预训练模型
-model = GPT2LMHeadModel.from_pretrained("/home1/zhenli/transformers/gpt2_model")
+model = GPT2LMHeadModel.from_pretrained("E:/gpt2")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 model.train()
@@ -19,7 +19,7 @@ optimizer = torch.optim.Adam(model.parameters(),lr = 0.0001)
 def select_top_k(predictions,k = 10):
     predicted_index = random.choice(predictions.sort(descending = True)[1][:k]).item()
     return predicted_index
-path = '/home1/zhenli/dialogues_train.txt'
+path = 'E:/dialogue/nonpersona/ijcnlp_dailydialog/train/train/dialogues_train.txt'
 f = open(path,'r',encoding='utf-8')
 l = f.read()
 l = l.split('\n')
@@ -58,8 +58,7 @@ for num in range(epoch):
                 input_tokens = torch.tensor([tokens]).to(device)
             else:
                 # 计算损失的过程
-                STD = torch.from_numpy(np.zeros(50257)).to(device)
-                STD = STD.view(1,-1)
+                STD = list()
                 PRE = torch.from_numpy(np.zeros(50257)).to(device)
                 PRE = PRE.view(1,-1)
                 C = tokenizer.encode(traindata[i])
@@ -76,26 +75,25 @@ for num in range(epoch):
                     input_tokens = torch.tensor([tokens]).to(device)
                     predictions = F.softmax(predictions, dim=0, dtype=torch.double).to(device)
                     predictions = predictions.view(1, -1)
-                    std = np.zeros(50257)
-                    std[c] = 1
-                    std = torch.tensor(std).to(device)
-                    std = std.view(1, -1)
-                    STD = (torch.cat((STD, std), 0)).to(device)
+                    STD.append(c)
                     PRE = (torch.cat((PRE, predictions), 0)).to(device)
                     if (predicted_index == 50256) or (length >= 20):
                         break
-                    if STD.shape[0] >= 4:
-                        loss = F.mse_loss(STD, PRE)
+                    if len(STD) >= 4:
+                        PRE = PRE[1:,:]
+                        STD = torch.tensor(STD,dtype=torch.long)
+                        loss = F.cross_entropy(PRE, STD)
                         a_loss += loss
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
-                        STD = torch.from_numpy(np.zeros(50257)).to(device)
-                        STD = STD.view(1, -1)
+                        STD = list()
                         PRE = torch.from_numpy(np.zeros(50257)).to(device)
                         PRE = PRE.view(1, -1)
-                if (int(torch.sum(STD)) != 0) and (int(torch.sum(PRE)) != 0):
-                    loss = F.mse_loss(STD,PRE)
+                if (len(STD) != 0) and (int(torch.sum(PRE)) != 0):
+                    PRE = PRE[1:, :]
+                    STD = torch.tensor(STD, dtype=torch.long)
+                    loss = F.cross_entropy(PRE,STD)
                     a_loss += loss
                     optimizer.zero_grad()
                     loss.backward()
@@ -134,8 +132,7 @@ for data in t_l:
                 tokens = tokens[-99:]
             input_tokens = torch.tensor([tokens]).to(device)
         else:
-            STD = torch.from_numpy(np.zeros(50257)).to(device)
-            STD = STD.view(1, -1)
+            STD = list()
             PRE = torch.from_numpy(np.zeros(50257)).to(device)
             PRE = PRE.view(1, -1)
             C = tokenizer.encode(testdata[i])
@@ -152,21 +149,20 @@ for data in t_l:
                 input_tokens = torch.tensor([tokens]).to(device)
                 predictions = F.softmax(predictions, dim=0, dtype=torch.double).to(device)
                 predictions = predictions.view(1, -1)
-                std = np.zeros(50257)
-                std[c] = 1
-                std = torch.tensor(std).to(device)
-                std = std.view(1, -1)
-                STD = (torch.cat((STD, std), 0)).to(device)
+                STD.append(c)
                 PRE = (torch.cat((PRE, predictions), 0)).to(device)
                 if (predicted_index == 50256) or (length >= 20):
                     break
-                if STD.shape[0] > 4:
-                    loss = F.mse_loss(STD, PRE)
+                if STD.shape[0] >= 4:
+                    PRE = PRE[1:, :]
+                    STD = torch.tensor(STD, dtype=torch.long)
+                    loss = F.cross_entropy(PRE, STD)
                     a_loss += loss
-                    STD = torch.from_numpy(np.zeros(50257)).to(device)
-                    STD = STD.view(1, -1)
+                    STD = list()
                     PRE = torch.from_numpy(np.zeros(50257)).to(device)
                     PRE = PRE.view(1, -1)
-            loss = F.mse_loss(STD, PRE)
+            PRE = PRE[1:, :]
+            STD = torch.tensor(STD, dtype=torch.long)
+            loss = F.mse_loss(PRE, STD)
             a_loss += loss
 print("test loss:", a_loss / sum)
