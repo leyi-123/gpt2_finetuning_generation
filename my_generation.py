@@ -67,38 +67,36 @@ for num in range(epoch):
                 STD = STD.view(1,-1)
                 PRE = torch.from_numpy(np.zeros(50257)).to(device)
                 PRE = PRE.view(1,-1)
-                for c in traindata[i].split(' '):
-                    if len(c)>=1:
-                        sum += 1
-                        T = tokenizer.encode(c)
-                        t = T[0]
-                        output = model(input_tokens)
-                        predictions = output[0][0, -1, :]
-                        predicted_index = select_top_k(predictions, k=10)
-                        tokens += [predicted_index]
-                        if len(tokens) > 1023:
-                            tokens = tokens[-1023:]
-                        input_tokens = torch.tensor([tokens]).to(device)
-                        predictions = F.softmax(predictions, dim=0, dtype=torch.double).to(device)
-                        predictions = predictions.view(1, -1)
-                        std = np.zeros(50257)
-                        std[t] = 1
-                        std = torch.tensor(std).to(device)
-                        std = std.view(1, -1)
-                        STD = (torch.cat((STD, std), 0)).to(device)
-                        PRE = (torch.cat((PRE, predictions), 0)).to(device)
-                        if predicted_index == 50256:
-                            break
-                        if STD.shape[0] > 8:
-                            loss = gen_loss(STD, PRE)
-                            a_loss += loss
-                            optimizer.zero_grad()
-                            loss.backward()
-                            optimizer.step()
-                            STD = torch.from_numpy(np.zeros(50257)).to(device)
-                            STD = STD.view(1, -1)
-                            PRE = torch.from_numpy(np.zeros(50257)).to(device)
-                            PRE = PRE.view(1, -1)
+                C = tokenizer.encode(traindata[i])
+                for c in C:
+                    sum += 1
+                    output = model(input_tokens)
+                    predictions = output[0][0, -1, :]
+                    predicted_index = select_top_k(predictions, k=10)
+                    tokens += [predicted_index]
+                    if len(tokens) > 1023:
+                        tokens = tokens[-1023:]
+                    input_tokens = torch.tensor([tokens]).to(device)
+                    predictions = F.softmax(predictions, dim=0, dtype=torch.double).to(device)
+                    predictions = predictions.view(1, -1)
+                    std = np.zeros(50257)
+                    std[c] = 1
+                    std = torch.tensor(std).to(device)
+                    std = std.view(1, -1)
+                    STD = (torch.cat((STD, std), 0)).to(device)
+                    PRE = (torch.cat((PRE, predictions), 0)).to(device)
+                    if predicted_index == 50256:
+                        break
+                    if STD.shape[0] >= 4:
+                        loss = gen_loss(STD, PRE)
+                        a_loss += loss
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+                        STD = torch.from_numpy(np.zeros(50257)).to(device)
+                        STD = STD.view(1, -1)
+                        PRE = torch.from_numpy(np.zeros(50257)).to(device)
+                        PRE = PRE.view(1, -1)
                 if (int(torch.sum(STD)) != 0) and (int(torch.sum(PRE)) != 0):
                     loss = gen_loss(STD,PRE)
                     a_loss += loss
@@ -143,35 +141,33 @@ for data in t_l:
             STD = STD.view(1, -1)
             PRE = torch.from_numpy(np.zeros(50257)).to(device)
             PRE = PRE.view(1, -1)
-            for c in testdata[i].split(' '):
-                if len(c) >= 1:
-                    sum += 1
-                    T = tokenizer.encode(c)
-                    t = T[0]
-                    output = model(input_tokens)
-                    predictions = output[0][0, -1, :]
-                    predicted_index = select_top_k(predictions, k=10)
-                    tokens += [predicted_index]
-                    if len(tokens) > 1023:
-                        tokens = tokens[-1023:]
-                    input_tokens = torch.tensor([tokens]).to(device)
-                    predictions = F.softmax(predictions, dim=0, dtype=torch.double).to(device)
-                    predictions = predictions.view(1, -1)
-                    std = np.zeros(50257)
-                    std[t] = 1
-                    std = torch.tensor(std).to(device)
-                    std = std.view(1, -1)
-                    STD = (torch.cat((STD, std), 0)).to(device)
-                    PRE = (torch.cat((PRE, predictions), 0)).to(device)
-                    if predicted_index == 50256:
-                        break
-                    if STD.shape[0] > 8:
-                        loss = gen_loss(STD, PRE)
-                        a_loss += loss
-                        STD = torch.from_numpy(np.zeros(50257)).to(device)
-                        STD = STD.view(1, -1)
-                        PRE = torch.from_numpy(np.zeros(50257)).to(device)
-                        PRE = PRE.view(1, -1)
+            C = tokenizer.encode(testdata[i])
+            for c in C:
+                sum += 1
+                output = model(input_tokens)
+                predictions = output[0][0, -1, :]
+                predicted_index = select_top_k(predictions, k=10)
+                tokens += [predicted_index]
+                if len(tokens) > 1023:
+                    tokens = tokens[-1023:]
+                input_tokens = torch.tensor([tokens]).to(device)
+                predictions = F.softmax(predictions, dim=0, dtype=torch.double).to(device)
+                predictions = predictions.view(1, -1)
+                std = np.zeros(50257)
+                std[c] = 1
+                std = torch.tensor(std).to(device)
+                std = std.view(1, -1)
+                STD = (torch.cat((STD, std), 0)).to(device)
+                PRE = (torch.cat((PRE, predictions), 0)).to(device)
+                if predicted_index == 50256:
+                    break
+                if STD.shape[0] > 8:
+                    loss = gen_loss(STD, PRE)
+                    a_loss += loss
+                    STD = torch.from_numpy(np.zeros(50257)).to(device)
+                    STD = STD.view(1, -1)
+                    PRE = torch.from_numpy(np.zeros(50257)).to(device)
+                    PRE = PRE.view(1, -1)
             loss = gen_loss(STD, PRE)
             a_loss += loss
 print("test loss:", a_loss / sum)
