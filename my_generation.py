@@ -35,7 +35,6 @@ epoch = 3
 a_loss = 0
 # 对训练数据的处理
 # 这里没有用torch里面的DataLoader, TensorDataset, 可以考虑改进
-# 主要思想是计算模型生成和标准之间的距离作为损失
 for num in range(epoch):
     i_sum = 0
     for data in l:
@@ -102,7 +101,7 @@ for num in range(epoch):
             print("epoch:",num,",train loss:",a_loss/sum)
             sum = 0
             a_loss = 0
-# 在测试集上评测结果
+# 在测试集计算损失
 # 具体过程与上类似
 model.save_pretrained("/home1/zhenli/")
 t_path = '/home1/zhenli/dialogues_test.txt'
