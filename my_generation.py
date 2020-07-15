@@ -83,7 +83,6 @@ for num in range(epoch):
                         PRE = PRE[1:,:]
                         STD = torch.tensor(STD,dtype=torch.long)
                         loss = F.cross_entropy(PRE, STD)
-                        print(loss)
                         a_loss += loss
                         optimizer.zero_grad()
                         loss.backward()
@@ -95,7 +94,6 @@ for num in range(epoch):
                     PRE = PRE[1:, :]
                     STD = torch.tensor(STD, dtype=torch.long)
                     loss = F.cross_entropy(PRE,STD)
-                    print(loss)
                     a_loss += loss
                     optimizer.zero_grad()
                     loss.backward()
