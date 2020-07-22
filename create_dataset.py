@@ -3,7 +3,7 @@ import math
 import os
 from dataclasses import dataclass, field
 from typing import Optional
-
+from tqdm import tqdm
 from transformers import (
     CONFIG_MAPPING,
     MODEL_WITH_LM_HEAD_MAPPING,
@@ -22,7 +22,7 @@ from transformers import (
 
 import pickle
 import time
-
+from torch.utils.data import DataLoader
 import torch
 from filelock import FileLock
 from torch.utils.data.dataset import Dataset
@@ -32,7 +32,7 @@ import re
 
 logger = logging.getLogger(__name__)
 tokenizer = GPT2Tokenizer.from_pretrained('./gpt2/')
-file_path = "E:/dialogue/personprofile/personachat/train_both_original.txt"
+file_path = "E:/dialogue/personprofile/personachat/test_both_original.txt"
 class MyTextDataset(Dataset):
     """
     This will be superseded by a framework-agnostic approach
@@ -66,57 +66,114 @@ class MyTextDataset(Dataset):
 
             else:
                 logger.info(f"Creating features from dataset file at {directory}")
-
                 self.examples = []
                 with open(file_path, encoding="utf-8") as f:
                     text = f.read()
                 text = text.split('\n')
-                p1 = ''
-                p2 = ''
-                d1 = ''
-                d2 = ''
-                t1 = ''
-                t2 = ''
-                flag = 0
-                for sentence in text:
-                    if "your persona:" in sentence:
-                        if flag == 1:
-                            flag = 0
-                            p1 = ''
-                            p2 = ''
+
+                def Persona1(text):
+                    persona1_l = list()
+                    p1 = ''
+                    flag = 0
+                    flag2 = 0
+                    for sentence in text:
+                        if "partner's persona:" in sentence:
+                            if flag == 1:
+                                flag2 = 0
+                                flag = 0
+                                p1 = ''
+                            sentence = re.sub('\d+ your persona:', '', sentence)
+                            p1 = p1 + ' ' + sentence
+                        elif "your persona:" not in sentence:
+                            flag = 1
+                            if flag2 == 0:
+                                flag2 = 1
+                                persona1 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(p1))
+                                if len(persona1) > 50:
+                                    persona1 = persona1[:50]
+                                elif len(persona1) < 50:
+                                    for i in range(50 - len(persona1)):
+                                        persona1.append(50257)
+                                persona1_l.append(persona1)
+                            else:
+                                persona1 = persona1_l[len(persona1_l)-1]
+                                persona1_l.append(persona1)
+                    return persona1_l
+                def Persona2(text):
+                    persona2_l = list()
+                    p2 = ''
+                    flag = 0
+                    flag2 = 0
+                    for sentence in text:
+                        if "your persona:" in sentence:
+                            if flag == 1:
+                                flag2 = 0
+                                flag = 0
+                                p2 = ''
+                            sentence = re.sub('\d+ your persona:', '', sentence)
+                            p2 = p2 + ' ' + sentence
+                        elif "partner's persona:" not in sentence:
+                            flag = 1
+                            if flag2 == 0:
+                                flag2 = 1
+                                persona2 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(p2))
+                                if len(persona2) > 50:
+                                    persona2 = persona2[:50]
+                                elif len(persona2) < 50:
+                                    for i in range(50 - len(persona2)):
+                                        persona2.append(50257)
+                                persona2_l.append(persona2)
+                            else:
+                                persona2 = persona2_l[len(persona2_l)-1]
+                                persona2_l.append(persona2)
+                    return persona2_l
+                def Context1(text):
+                    d1 = ''
+                    context1_l = list()
+                    for sentence in text:
+                        if ("your persona:" in sentence) or ("partner's persona:" in sentence):
                             d1 = ''
+                        elif ("your persona:" not in sentence) and ("partner's persona:" not in sentence):
+                            chat = sentence.split('\t')
+                            if len(chat) > 2:
+                                context1 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(d1))
+                                if len(context1) > 50:
+                                    context1 = context1[-50:]
+                                elif len(context1) < 50:
+                                    for i in range(50 - len(context1)):
+                                        context1.append(50257)
+                                context1_l.append(context1)
+                                r1 = chat[0] + ' <|endoftext|>'
+                                r2 = chat[1] + " <|endoftext|>"
+                                d1 = d1 + ' ' + r1 + ' ' + r2
+                    return context1_l
+                def Context2(text):
+                    d2 = ''
+                    context2_l = list()
+                    for sentence in text:
+                        if ("your persona:" in sentence) or ("partner's persona:" in sentence):
                             d2 = ''
-                        sentence = re.sub('\d+ your persona:', '', sentence)
-                        p2 += (sentence)
-                    elif "partner's persona" in sentence:
-                        if flag == 1:
-                            flag = 0
-                            p1 = ''
-                            p2 = ''
-                            d1 = ''
-                            d2 = ''
-                        sentence = re.sub("\d+ partner's persona:", '', sentence)
-                        p1 += (sentence)
-                    else:
+                        elif ("your persona:" not in sentence) and ("partner's persona:" not in sentence):
+                            chat = sentence.split('\t')
+                            if len(chat) > 2:
+                                r1 = chat[0] + ' <|endoftext|>'
+                                r2 = chat[1] + " <|endoftext|>"
+                                d2 = d2 + ' ' + r1
+                                context2 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(d2))
+                                if len(context2) > 50:
+                                    context2 = context2[-50:]
+                                elif len(context2) < 50:
+                                    for i in range(50 - len(context2)):
+                                        context2.append(50257)
+                                context2_l.append(context2)
+                                d2 = d2 + ' ' + r2
+                    return context2_l
+                def Response1(text):
+                    response1_l = list()
+                    for sentence in text:
                         chat = sentence.split('\t')
-                        flag = 1
-                        if len(chat) >= 2:
-                            context1 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(d1))
-                            persona1 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(p1))
-                            if (len(context1) + len(persona1)) > 100:
-                                if len(persona1) <= 100:
-                                    t = context1[-(100 - len(persona1)):]
-                                    context1 = persona1 + t
-                                else:
-                                    context1 = persona1[-100:]
-                            elif (len(context1) + len(persona1)) < 100:
-                                d_pad = list()
-                                for i in range(100 - len(persona1) - len(context1)):
-                                    d_pad.append(50257)
-                                context1 = persona1 + context1 + d_pad
-                            elif (len(context1) + len(persona1)) == 100:
-                                context1 = persona1 + context1
-                            r1 = chat[0]
+                        if len(chat) > 2:
+                            r1 = chat[0] + ' <|endoftext|>'
                             r_t = ''
                             for s in range(len(r1)):
                                 if (r1[s] in "1234567890") and (s <= 3):
@@ -126,32 +183,18 @@ class MyTextDataset(Dataset):
                             r1 = r_t
                             response1 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(r1))
                             if len(response1) < 20:
-                                r1_pad = r1
                                 for i in range(20 - len(response1)):
-                                    r1_pad += '<pad>'
-                                response1 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(r1_pad))
+                                    response1.append(50257)
                             elif len(response1) > 20:
-                                response1 = response1[-20:]
-                            traindata1 = context1 + response1
-                            self.examples.append(traindata1)
-                            d2 = d1 + chat[0]
-                            d1 = d1 + chat[0] + chat[1]
-                            context2 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(d2))
-                            persona2 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(p2))
-                            if (len(context2) + len(persona2)) > 100:
-                                if len(persona2) <= 100:
-                                    context2 = context2[-(100 - len(persona2)):]
-                                    context2 = persona2 + context2
-                                else:
-                                    context2 = persona2[-100:]
-                            elif (len(context2) + len(persona2)) < 100:
-                                d_pad = list()
-                                for i in range(100 - len(persona2) - len(context2)):
-                                    d_pad.append(50257)
-                                context2 = context2 + persona2 + d_pad
-                            elif (len(context2) + len(persona2)) == 100:
-                                context2 = context2 + persona2
-                            r2 = chat[1]
+                                response1 = response1[:20]
+                            response1_l.append(response1)
+                    return response1_l
+                def Response2(text):
+                    response2_l = list()
+                    for sentence in text:
+                        chat = sentence.split('\t')
+                        if len(chat) > 2:
+                            r2 = chat[0] + ' <|endoftext|>'
                             r_t = ''
                             for s in range(len(r2)):
                                 if (r2[s] in "1234567890") and (s <= 3):
@@ -161,15 +204,24 @@ class MyTextDataset(Dataset):
                             r2 = r_t
                             response2 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(r2))
                             if len(response2) < 20:
-                                r2_pad = r2
                                 for i in range(20 - len(response2)):
-                                    r2_pad += '<pad>'
-                                response2 = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(r2_pad))
+                                    response2.append(50257)
                             elif len(response2) > 20:
-                                response2 = response2[-20:]
-                            traindata2 = context2 + response2
-                            d2 = d2 + chat[1]
-                            self.examples.append(traindata2)
+                                response2 = response2[:20]
+                            response2_l.append(response2)
+                    return response2_l
+                persona1 = Persona1(text)
+                persona2 = Persona2(text)
+                context1 = Context1(text)
+                context2 = Context2(text)
+                response1 = Response1(text)
+                response2 = Response2(text)
+                for i in range(len(response1)):
+                    t = persona1[i] + context1[i] + response1[i]
+                    self.examples.append(t)
+                for i in range(len(response2)):
+                    t = persona2[i] + context2[i] + response2[i]
+                    self.examples.append(t)
                 # Note that we are losing the last truncated example here for the sake of simplicity (no padding)
                 # If your dataset is small, first you should loook for a bigger one :-) and second you
                 # can change this behavior by adding (model specific) padding.
